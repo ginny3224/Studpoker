@@ -1,38 +1,51 @@
-import tkinter as tk
 from game import StudGame
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QTextEdit, QVBoxLayout
 
 class StudGameGUI:
     def __init__(self):
-        print("StudGameGUI __init__ called")
-        self.root = tk.Tk()
-        self.root.title("Stud Poker Game")
+        self.app = QApplication(sys.argv)
+        self.window = QWidget()
+        self.window.setWindowTitle("Stud Poker Game")
 
         # Create input fields for player chips, small blind, and big blind
-        tk.Label(self.root, text="Player Chips:").pack()
-        self.chips_entry = tk.Entry(self.root)
-        self.chips_entry.pack()
+        self.chips_label = QLabel("Player Chips:")
+        self.chips_entry = QLineEdit()
 
-        tk.Label(self.root, text="Small Blind:").pack()
-        self.small_blind_entry = tk.Entry(self.root)
-        self.small_blind_entry.pack()
+        self.small_blind_label = QLabel("Small Blind:")
+        self.small_blind_entry = QLineEdit()
 
-        tk.Label(self.root, text="Big Blind:").pack()
-        self.big_blind_entry = tk.Entry(self.root)
-        self.big_blind_entry.pack()
+        self.big_blind_label = QLabel("Big Blind:")
+        self.big_blind_entry = QLineEdit()
 
         # Create button to start the game
-        tk.Button(self.root, text="Start Game", command=self.start_game).pack()
+        self.start_game_button = QPushButton("Start Game")
+        self.start_game_button.clicked.connect(self.start_game)
 
         # Create text area to display game output
-        self.text_area = tk.Text(self.root)
-        self.text_area.pack()
+        self.text_area = QTextEdit()
+
+        # Layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.chips_label)
+        layout.addWidget(self.chips_entry)
+        layout.addWidget(self.small_blind_label)
+        layout.addWidget(self.small_blind_entry)
+        layout.addWidget(self.big_blind_label)
+        layout.addWidget(self.big_blind_entry)
+        layout.addWidget(self.start_game_button)
+        layout.addWidget(self.text_area)
+
+        self.window.setLayout(layout)
+
+        self.window.show()
+        print("GUI created successfully")
 
     def start_game(self):
-        print("Start game called")
         # Get player chips, small blind, and big blind from input fields
-        chips = int(self.chips_entry.get())
-        small_blind = int(self.small_blind_entry.get())
-        big_blind = int(self.big_blind_entry.get())
+        chips = int(self.chips_entry.text())
+        small_blind = int(self.small_blind_entry.text())
+        big_blind = int(self.big_blind_entry.text())
 
         # Create a new game instance
         game = StudGame(7, chips, small_blind, big_blind)
@@ -42,13 +55,13 @@ class StudGameGUI:
 
         # Display player up cards in the GUI
         player_up_cards = game.get_player_up_cards()
-        self.text_area.insert(tk.END, "Player Up Cards:\n")
+        self.text_area.append("Player Up Cards:")
         for card in player_up_cards:
-            self.text_area.insert(tk.END, f"{card[0]} of {card[1]}\n")
+            self.text_area.append(f"{card[0]} of {card[1]}")
 
         # Display game output in the text area
-        self.text_area.insert(tk.END, f"Winner: {winner}")
+        self.text_area.append(f"Winner: {winner}")
 
 if __name__ == "__main__":
     gui = StudGameGUI()
-    gui.root.mainloop()
+    sys.exit(gui.app.exec_())
