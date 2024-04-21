@@ -74,9 +74,13 @@ def main():
     bring_in_player = determine_bring_in(players)
     print(f"The bring-in is: {bring_in_player.name}")
 
+    # Rotate players list to start with bring-in player
+    bring_in_index = players.index(bring_in_player)
+    players = players[bring_in_index:] + players[:bring_in_index]
+
     # Game loop for betting rounds and drawing cards
-    for round in range(3):  # Three betting rounds (adjust as needed)
-        print(f"\n--- Round {round + 1} ---")
+    for round_num in range(3):  # Three betting rounds (adjust as needed)
+        print(f"\n--- Round {round_num + 1} ---")
 
         # Display players' cards based on visibility rules
         for player in players:
@@ -99,7 +103,6 @@ def main():
             print_colored(f"\nThe bring-in is: {bring_in_player.name}", COLOR_GREEN)
 
         # Betting phase
-        previous_bet = 0
         for player in players:
             print(f"\n{player.name}'s turn:")
             if player.name == bring_in_player.name:
@@ -116,29 +119,26 @@ def main():
                 if player_action == "bet":
                     bet_amount = SMALL_BET_AMOUNT
                 elif player_action == "raise":
-                    bet_amount = previous_bet * 2  # Double the previous bet
+                    bet_amount = players[0].bet_amount * 2  # Double the previous bet amount
                 elif player_action == "call":
-                    bet_amount = previous_bet
+                    bet_amount = players[0].bet_amount
                 else:
                     bet_amount = 0  # Fold or check (no bet)
-                
-                previous_bet = bet_amount
             else:
                 # CPU players make automated bet decisions (based on limit rules)
-                if round == 0:
+                if round_num == 0:
                     # First betting round (bring-in)
                     bet_amount = BRING_IN_AMOUNT
-                elif round == 1:
+                elif round_num == 1:
                     # Second betting round (small bet)
                     bet_amount = SMALL_BET_AMOUNT
-                elif round == 2:
+                elif round_num == 2:
                     # Third betting round (big bet)
                     bet_amount = BIG_BET_AMOUNT
                 else:
                     bet_amount = 0  # No bet (fold or check)
                 print_colored(f"{player.name} bets: {bet_amount}", COLOR_BLUE)  # Print CPU player's action in blue
-                previous_bet = bet_amount
-            player.bet(bet_amount)
+            player.bet(bet_amount)  # Pass the bet amount to the bet method
 
         # Card drawing phase (deal one card to each player)
         for player in players:
@@ -146,17 +146,13 @@ def main():
             player.receive_card(new_card)
             print(f"{player.name} draws: {new_card}")
 
-        # Determine next first player based on the strength of face-up cards for next round
-        first_player = determine_first_player(players)
-        player_index = players.index(first_player)
-        players = players[player_index:] + players[:player_index]  # Rotate list based on new first player
-
     # Showdown - evaluate hands and determine winner
     print("\n--- Showdown ---")
     for player in players:
         print(f"{player.name}'s hand: {', '.join(str(card) for card in player.hand)}")
 
-    winner = utils.determine_winner(players)
+    # Determine winner based on hand evaluation
+    winner = max(players, key=lambda player: utils.evaluate_hand(player.hand))
     print(f"\nWinner: {winner.name} with {utils.evaluate_hand(winner.hand)}")
 
 if __name__ == "__main__":
