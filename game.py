@@ -1,90 +1,163 @@
 import random
+from deck import Deck
+from player import Player
+import utils
 
-class StudGame:
-    def __init__(self, num_players, chips, small_blind, big_blind):
-        self.num_players = num_players
-        self.chips = chips
-        self.small_blind = small_blind
-        self.big_blind = big_blind
-        self.hands = deal_cards(num_players * 7)
-        self.pot = 0
-        self.bet_amount = 0
-        self.player_controller = 0  # Player 1 is the controller
+# ANSI color escape codes (change text color)
+COLOR_GREEN = "\033[92m"  # Green color
+COLOR_BLUE = "\033[94m"   # Blue color
+COLOR_RESET = "\033[0m"    # Reset to default color
 
-    def play_round(self):
-        # Deal cards
-        hands = [self.hands[i:i+7] for i in range(0, len(self.hands), 7)]
+# Betting limits
+ANTE_AMOUNT = 10  # Ante amount (starting mandatory bet)
+BRING_IN_AMOUNT = 20  # Bring-in amount (forced bet by the player with the lowest visible card)
+SMALL_BET_AMOUNT = 20  # Small bet amount
+BIG_BET_AMOUNT = 40  # Big bet amount
 
-        # Display player up cards
-        self.display_player_up_cards()
+def determine_first_player(players):
+    """Determine the player who acts first based on the strength of their face-up cards."""
+    first_player = None
+    highest_rank = -1  # Initialize with a low value
+    for player in players:
+        visible_card = player.hand[2]  # Index 2 is the first face-up card
+        rank_value = utils.get_card_rank_value(visible_card)
+        if rank_value > highest_rank:
+            highest_rank = rank_value
+            first_player = player
+    return first_player
 
-        # Determine first actor
-        first_actor = self.determine_first_actor()
+def determine_bring_in(players):
+    """Determine the player who is the bring-in (lowest visible card)."""
+    bring_in_player = None
+    smallest_rank = float('inf')  # Initialize with a high value
+    for player in players:
+        visible_card = player.hand[2]  # Index 2 is the first face-up card
+        rank_value = utils.get_card_rank_value(visible_card)
+        if rank_value < smallest_rank:
+            smallest_rank = rank_value
+            bring_in_player = player
+    return bring_in_player
 
-        # Play round
-        for i in range(5):
-            # Ask each player for their action (Check, Bet, Raise, Fold)
-            for player in range(self.num_players):
-                if player == self.player_controller:
-                    # Player controller
-                    action = input(f"Player {player+1}, what would you like to do? (Check, Bet, Raise, Fold) ")
+def print_colored(message, color):
+    """Print a message in the specified color."""
+    print(f"{color}{message}{COLOR_RESET}")
+
+def main():
+    print("Welcome to 7 Card Stud Poker!")
+
+    # Get number of players from user
+    num_players = int(input("Enter the number of players (2-8): "))
+    while num_players < 2 or num_players > 8:
+        num_players = int(input("Invalid number of players. Please enter a number between 2 and 8: "))
+
+    # Create players
+    players = []
+    player_names = ["Player 1"] + [f"CPU {i}" for i in range(2, num_players + 1)]
+    for name in player_names:
+        players.append(Player(name))
+
+    # Initialize deck and shuffle
+    deck = Deck()
+    deck.shuffle()
+
+    # Deal initial cards
+    for _ in range(3):  # Deal three cards (two face down, one face up)
+        for player in players:
+            player.receive_card(deck.deal_card())
+
+    # Determine first player based on the strength of face-up cards
+    first_player = determine_first_player(players)
+    player_index = players.index(first_player)
+    players = players[player_index:] + players[:player_index]  # Rotate list based on first player
+
+    # Determine bring-in player (lowest visible card)
+    bring_in_player = determine_bring_in(players)
+    print(f"The bring-in is: {bring_in_player.name}")
+
+    # Game loop for betting rounds and drawing cards
+    for round in range(3):  # Three betting rounds (adjust as needed)
+        print(f"\n--- Round {round + 1} ---")
+
+        # Display players' cards based on visibility rules
+        for player in players:
+            if player.name == "Player 1":
+                # Human player can see all cards
+                print(f"\n{player.name}'s cards: {', '.join(str(card) for card in player.hand)}")
+            else:
+                # CPU players can only see the face-up card
+                visible_cards = [str(card) if index == 2 else "???" for index, card in enumerate(player.hand)]
+                cpu_cards_display = ', '.join(visible_cards)
+                if player == bring_in_player:
+                    # Print bring-in message in green color for the bring-in player
+                    print_colored(f"\n{player.name}'s cards: {cpu_cards_display}", COLOR_GREEN)
                 else:
-                    # CPU-controlled player
-                    action = self.cpu_player_action()
+                    # Print other CPU players' cards in default color
+                    print(f"\n{player.name}'s cards: {cpu_cards_display}")
 
-                if action.lower() == 'bet':
-                    self.bet_amount = int(input("Enter bet amount: "))
-                    self.pot += self.bet_amount
-                elif action.lower() == 'raise':
-                    self.bet_amount = int(input("Enter raise amount: "))
-                    self.pot += self.bet_amount
-                elif action.lower() == 'fold':
-                    # Remove player from the game
-                    pass
+        # Print bring-in message for human player
+        if bring_in_player == players[0]:  # Check if bring-in player is the first player (human player)
+            print_colored(f"\nThe bring-in is: {bring_in_player.name}", COLOR_GREEN)
 
-        # Determine winner
-        winner = self.determine_winner(hands)
-        return winner
+        # Betting phase
+        previous_bet = 0
+        for player in players:
+            print(f"\n{player.name}'s turn:")
+            if player.name == bring_in_player.name:
+                # Bring-in player makes bring-in bet
+                bet_amount = BRING_IN_AMOUNT
+            elif player.name == "Player 1":
+                # Human player makes betting decision (fold, check, bet, raise, call)
+                valid_actions = ["fold", "check", "bet", "raise", "call"]
+                print("Valid actions: fold, check, bet, raise, call")
+                player_action = input("Enter your action: ").lower()
+                while player_action not in valid_actions:
+                    player_action = input("Invalid action. Enter 'fold', 'check', 'bet', 'raise', or 'call': ").lower()
+                
+                if player_action == "bet":
+                    bet_amount = SMALL_BET_AMOUNT
+                elif player_action == "raise":
+                    bet_amount = previous_bet * 2  # Double the previous bet
+                elif player_action == "call":
+                    bet_amount = previous_bet
+                else:
+                    bet_amount = 0  # Fold or check (no bet)
+                
+                previous_bet = bet_amount
+            else:
+                # CPU players make automated bet decisions (based on limit rules)
+                if round == 0:
+                    # First betting round (bring-in)
+                    bet_amount = BRING_IN_AMOUNT
+                elif round == 1:
+                    # Second betting round (small bet)
+                    bet_amount = SMALL_BET_AMOUNT
+                elif round == 2:
+                    # Third betting round (big bet)
+                    bet_amount = BIG_BET_AMOUNT
+                else:
+                    bet_amount = 0  # No bet (fold or check)
+                print_colored(f"{player.name} bets: {bet_amount}", COLOR_BLUE)  # Print CPU player's action in blue
+                previous_bet = bet_amount
+            player.bet(bet_amount)
 
-    def cpu_player_action(self):
-        # CPU-controlled player action logic
-        pass
+        # Card drawing phase (deal one card to each player)
+        for player in players:
+            new_card = deck.deal_card()
+            player.receive_card(new_card)
+            print(f"{player.name} draws: {new_card}")
 
-    def display_player_up_cards(self):
-        # Display player up cards logic
-        pass
+        # Determine next first player based on the strength of face-up cards for next round
+        first_player = determine_first_player(players)
+        player_index = players.index(first_player)
+        players = players[player_index:] + players[:player_index]  # Rotate list based on new first player
 
-    def get_player_up_cards(self):
-        # Return player up cards
-        pass
+    # Showdown - evaluate hands and determine winner
+    print("\n--- Showdown ---")
+    for player in players:
+        print(f"{player.name}'s hand: {', '.join(str(card) for card in player.hand)}")
 
-    def determine_first_actor(self):
-        # Determine the first actor based on the highest upcard
-        upcards = [hand[0] for hand in self.hands]
-        first_actor = upcards.index(max(upcards))
-        return first_actor
+    winner = utils.determine_winner(players)
+    print(f"\nWinner: {winner.name} with {utils.evaluate_hand(winner.hand)}")
 
-    def determine_winner(self, hands):
-        # Determine the winner based on the highest hand
-        winning_hand = max(hands, key=self.hand_rank)
-        winner = hands.index(winning_hand)
-        return winner
-
-    def hand_rank(self, hand):
-        # Rank the hand based on the rules of stud poker
-        # For example, return the sum of the card values
-        return sum(card[0] for card in hand)
-
-def deal_cards(num_cards):
-    # Deal the cards
-    # For example, return a list of tuples representing the cards
-    return [(1, 'Hearts'), (2, 'Diamonds'), (3, 'Clubs'), (4, 'Spades')] * (num_cards // 4)
-
-# Create a new game instance
-game = StudGame(7, 1000, 10, 20)
-
-# Play the game
-winner = game.play_round()
-
-# Display the winner
-print(f"Winner: Player {winner+1}")
+if __name__ == "__main__":
+    main()
